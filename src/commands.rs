@@ -1,0 +1,83 @@
+use umbral_pre::*;
+
+use crate::cli::{DecryptArgs, EncryptArgs, GrantArgs, PreArgs};
+
+pub fn new_account() {
+    let sk = SecretKey::random();
+    let pk = sk.public_key();
+
+    println!("private key: {:x}", sk.to_secret_array().as_secret());
+    println!("public key: {:x}", pk.to_array());
+}
+
+pub fn encrypt(encrypt_args: EncryptArgs) {
+    let (capsule, ciphertext) =
+        umbral_pre::encrypt(&encrypt_args.sender_pk, &encrypt_args.plaintext.as_bytes()).unwrap();
+
+    println!("capsule: {:x}", capsule.to_array());
+    println!("ciphertext: {}", hex::encode(ciphertext));
+}
+
+pub fn grant(grant_args: GrantArgs) {
+    // Create a new signer, this can't be serialised for security reasons.
+    let signer = umbral_pre::Signer::new(SecretKey::random());
+    let verifying_pk = signer.verifying_key();
+
+    println!("verifying public key: {:x}", verifying_pk.to_array());
+
+    let verified_kfrags = generate_kfrags(
+        &grant_args.sender_sk,
+        &grant_args.receiver_pk,
+        &signer,
+        grant_args.threshold,
+        grant_args.shares,
+        true,
+        true,
+    );
+
+    for kfrag in verified_kfrags.into_iter() {
+        println!("kfrag: {:x}", kfrag.to_array())
+    }
+}
+
+pub fn pre(pre_args: PreArgs) {
+    let verified_kfrag = pre_args
+        .kfrag
+        .verify(
+            &pre_args.verifying_pk,
+            Some(&pre_args.sender_pk),
+            Some(&pre_args.receiver_pk),
+        )
+        .unwrap();
+    let verified_cfrag = reencrypt(&pre_args.capsule, verified_kfrag);
+
+    println!("cfrag: {:x}", verified_cfrag.to_array());
+}
+
+pub fn decrypt(decrypt_args: DecryptArgs) {
+    let verified_cfrags: Vec<VerifiedCapsuleFrag> = decrypt_args
+        .cfrags
+        .into_iter()
+        .map(|cfrag| {
+            cfrag
+                .verify(
+                    &decrypt_args.capsule,
+                    &decrypt_args.verifying_pk,
+                    &decrypt_args.sender_pk,
+                    &decrypt_args.receiver_pk,
+                )
+                .unwrap()
+        })
+        .collect();
+
+    let plaintext = decrypt_reencrypted(
+        &decrypt_args.receiver_sk,
+        &decrypt_args.sender_pk,
+        &decrypt_args.capsule,
+        verified_cfrags,
+        &hex::decode(&decrypt_args.ciphertext).unwrap(),
+    )
+    .unwrap();
+
+    println!("{:?}", plaintext);
+}
