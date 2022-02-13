@@ -2,23 +2,27 @@ use umbral_pre::*;
 
 use crate::cli::{DecryptArgs, EncryptArgs, GrantArgs, PreArgs};
 
-pub fn new_account() {
+pub fn new_account() -> (SecretKey, PublicKey) {
     let sk = SecretKey::random();
     let pk = sk.public_key();
 
     println!("private key: {:x}", sk.to_secret_array().as_secret());
     println!("public key: {:x}", pk.to_array());
+
+    (sk, pk)
 }
 
-pub fn encrypt(encrypt_args: EncryptArgs) {
+pub fn encrypt(encrypt_args: EncryptArgs) -> (Capsule, Box<[u8]>) {
     let (capsule, ciphertext) =
         umbral_pre::encrypt(&encrypt_args.sender_pk, &encrypt_args.plaintext.as_bytes()).unwrap();
 
     println!("capsule: {:x}", capsule.to_array());
-    println!("ciphertext: {}", hex::encode(ciphertext));
+    println!("ciphertext: {}", hex::encode(ciphertext.clone()));
+
+    (capsule, ciphertext)
 }
 
-pub fn grant(grant_args: GrantArgs) {
+pub fn grant(grant_args: GrantArgs) -> (PublicKey, Box<[VerifiedKeyFrag]>) {
     // Create a new signer, this can't be serialised for security reasons.
     let signer = umbral_pre::Signer::new(SecretKey::random());
     let verifying_pk = signer.verifying_key();
@@ -35,12 +39,14 @@ pub fn grant(grant_args: GrantArgs) {
         true,
     );
 
-    for kfrag in verified_kfrags.into_iter() {
-        println!("kfrag: {:x}", kfrag.to_array())
+    for verified_kfrag in verified_kfrags.into_iter() {
+        println!("kfrag: {:x}", verified_kfrag.to_array())
     }
+
+    (verifying_pk, verified_kfrags)
 }
 
-pub fn pre(pre_args: PreArgs) {
+pub fn pre(pre_args: PreArgs) -> VerifiedCapsuleFrag {
     let verified_kfrag = pre_args
         .kfrag
         .verify(
@@ -52,9 +58,11 @@ pub fn pre(pre_args: PreArgs) {
     let verified_cfrag = reencrypt(&pre_args.capsule, verified_kfrag);
 
     println!("cfrag: {:x}", verified_cfrag.to_array());
+
+    verified_cfrag
 }
 
-pub fn decrypt(decrypt_args: DecryptArgs) {
+pub fn decrypt(decrypt_args: DecryptArgs) -> Box<[u8]> {
     let verified_cfrags: Vec<VerifiedCapsuleFrag> = decrypt_args
         .cfrags
         .into_iter()
@@ -80,4 +88,6 @@ pub fn decrypt(decrypt_args: DecryptArgs) {
     .unwrap();
 
     println!("{:?}", plaintext);
+
+    plaintext
 }
