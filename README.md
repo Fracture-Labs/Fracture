@@ -24,27 +24,27 @@ umbral_ipfs grant \
   --threshold <THRESHOLD> \
   --shares <SHARES>
 
-# Outputs: 
+# Outputs:
 # VERIFYING_PK
 # KFRAG
 # KFRAG
 # ...
 
-umbral_ipfs pre \ 
-  --capsule <CAPSULE> \ 
-  --kfrag <KFRAG> \ 
-  --sender-pk <SENDER_PK> \ 
-  --receiver-pk <RECEIVER_PK> \ 
+umbral_ipfs pre \
+  --capsule-cid <CAPSULE_CID> \
+  --kfrag <KFRAG> \
+  --sender-pk <SENDER_PK> \
+  --receiver-pk <RECEIVER_PK> \
   --verifying-pk <VERIFYING_PK>
 
-# Outputs: 
+# Outputs:
 # CFRAG
 # CFRAG
 # ...
 
 umbral_ipfs decrypt \
-  --capsule <CAPSULE> \
-  --ciphertext <CIPHERTEXT> \
+  --capsule-cid <CAPSULE_CID> \
+  --ciphertext-cid <CIPHERTEXT_CID> \
   --cfrags <[CFRAG]> \
   --sender-pk <SENDER_PK> \
   --receiver-sk <RECEIVER_SK> \
