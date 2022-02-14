@@ -3,9 +3,9 @@ use std::io::Cursor;
 use futures::TryStreamExt;
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient};
 
-type CIDv0 = String;
+pub type CIDv0 = String;
 
-async fn write(bytes: Vec<u8>) -> CIDv0 {
+pub async fn write(bytes: Vec<u8>) -> CIDv0 {
     let client = IpfsClient::default();
     let data = Cursor::new(bytes);
 
@@ -15,7 +15,7 @@ async fn write(bytes: Vec<u8>) -> CIDv0 {
     }
 }
 
-async fn read(cid: CIDv0) -> Vec<u8> {
+pub async fn read(cid: CIDv0) -> Vec<u8> {
     let client = IpfsClient::default();
 
     match client

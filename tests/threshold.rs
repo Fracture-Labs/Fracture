@@ -1,10 +1,8 @@
 use umbral_ipfs::{cli::*, commands::*};
-use umbral_pre::{
-    CapsuleFrag, DeserializableFromArray, KeyFrag, SerializableToArray, VerifiedCapsuleFrag,
-};
+use umbral_pre::{CapsuleFrag, DeserializableFromArray, KeyFrag, SerializableToArray};
 
-#[test]
-fn encrypt_decrypt() {
+#[tokio::test]
+async fn encrypt_decrypt() {
     const PLAINTEXT: &str = "Threshold is cool!";
     const THRESHOLD: usize = 2;
     const SHARES: usize = 3;
@@ -18,7 +16,7 @@ fn encrypt_decrypt() {
         plaintext: String::from(PLAINTEXT),
     };
 
-    let (capsule, ciphertext) = encrypt(encrypt_args);
+    let (capsule_cid, ciphertext_cid) = encrypt(encrypt_args).await;
 
     // Create the key fragments and distribute them to each proxy.
     let grant_args = GrantArgs {
@@ -38,19 +36,20 @@ fn encrypt_decrypt() {
         .collect();
 
     // N proxies perform re-encryption (PRE).
-    let verified_cfrags: Vec<VerifiedCapsuleFrag> = (0..SHARES)
-        .map(|i| {
-            let pre_args = PreArgs {
-                capsule,
-                kfrag: kfrags[i].clone(),
-                sender_pk,
-                receiver_pk,
-                verifying_pk,
-            };
+    let mut verified_cfrags = vec![];
+    for i in 0..SHARES {
+        let pre_args = PreArgs {
+            capsule_cid: capsule_cid.clone(),
+            kfrag: kfrags[i].clone(),
+            sender_pk,
+            receiver_pk,
+            verifying_pk,
+        };
 
-            pre(pre_args)
-        })
-        .collect();
+        let verified_cfrag = pre(pre_args).await;
+
+        verified_cfrags.push(verified_cfrag);
+    }
 
     // Verified cfrags become non-verified cfrags when serialised (i.e. when sent over the network
     // from the proxies to the receiver).
@@ -60,8 +59,8 @@ fn encrypt_decrypt() {
         .collect();
 
     let decrypt_args = DecryptArgs {
-        capsule,
-        ciphertext: hex::encode(ciphertext),
+        capsule_cid,
+        ciphertext_cid,
         cfrags,
         sender_pk,
         receiver_sk,
@@ -69,7 +68,7 @@ fn encrypt_decrypt() {
         verifying_pk,
     };
 
-    let plaintext = decrypt(decrypt_args);
+    let plaintext = decrypt(decrypt_args).await;
 
     assert_eq!(*plaintext, *PLAINTEXT.as_bytes());
 }

@@ -1,6 +1,9 @@
 use umbral_pre::*;
 
-use crate::cli::{DecryptArgs, EncryptArgs, GrantArgs, PreArgs};
+use crate::{
+    cli::{DecryptArgs, EncryptArgs, GrantArgs, PreArgs},
+    ipfs_io::{self, CIDv0},
+};
 
 pub fn new_account() -> (SecretKey, PublicKey) {
     let sk = SecretKey::random();
@@ -12,14 +15,18 @@ pub fn new_account() -> (SecretKey, PublicKey) {
     (sk, pk)
 }
 
-pub fn encrypt(encrypt_args: EncryptArgs) -> (Capsule, Box<[u8]>) {
+pub async fn encrypt(encrypt_args: EncryptArgs) -> (CIDv0, CIDv0) {
     let (capsule, ciphertext) =
         umbral_pre::encrypt(&encrypt_args.sender_pk, &encrypt_args.plaintext.as_bytes()).unwrap();
 
     println!("capsule: {:x}", capsule.to_array());
     println!("ciphertext: {}", hex::encode(ciphertext.clone()));
 
-    (capsule, ciphertext)
+    // Write to ipfs.
+    let capsule_cid = ipfs_io::write(capsule.to_array().to_vec()).await;
+    let ciphertext_cid = ipfs_io::write(ciphertext.to_vec()).await;
+
+    (capsule_cid, ciphertext_cid)
 }
 
 pub fn grant(grant_args: GrantArgs) -> (PublicKey, Box<[VerifiedKeyFrag]>) {
@@ -46,7 +53,7 @@ pub fn grant(grant_args: GrantArgs) -> (PublicKey, Box<[VerifiedKeyFrag]>) {
     (verifying_pk, verified_kfrags)
 }
 
-pub fn pre(pre_args: PreArgs) -> VerifiedCapsuleFrag {
+pub async fn pre(pre_args: PreArgs) -> VerifiedCapsuleFrag {
     let verified_kfrag = pre_args
         .kfrag
         .verify(
@@ -55,21 +62,30 @@ pub fn pre(pre_args: PreArgs) -> VerifiedCapsuleFrag {
             Some(&pre_args.receiver_pk),
         )
         .unwrap();
-    let verified_cfrag = reencrypt(&pre_args.capsule, verified_kfrag);
+
+    // Read data from ipfs.
+    let capsule = Capsule::from_bytes(ipfs_io::read(pre_args.capsule_cid).await).unwrap();
+
+    // Generate the capsule fragments.
+    let verified_cfrag = reencrypt(&capsule, verified_kfrag);
 
     println!("cfrag: {:x}", verified_cfrag.to_array());
 
     verified_cfrag
 }
 
-pub fn decrypt(decrypt_args: DecryptArgs) -> Box<[u8]> {
+pub async fn decrypt(decrypt_args: DecryptArgs) -> Box<[u8]> {
+    // Read capsule and ciphertext from ipfs.
+    let capsule = Capsule::from_bytes(ipfs_io::read(decrypt_args.capsule_cid).await).unwrap();
+    let ciphertext = ipfs_io::read(decrypt_args.ciphertext_cid).await;
+
     let verified_cfrags: Vec<VerifiedCapsuleFrag> = decrypt_args
         .cfrags
         .into_iter()
         .map(|cfrag| {
             cfrag
                 .verify(
-                    &decrypt_args.capsule,
+                    &capsule,
                     &decrypt_args.verifying_pk,
                     &decrypt_args.sender_pk,
                     &decrypt_args.receiver_pk,
@@ -81,10 +97,9 @@ pub fn decrypt(decrypt_args: DecryptArgs) -> Box<[u8]> {
     let plaintext = decrypt_reencrypted(
         &decrypt_args.receiver_sk,
         &decrypt_args.sender_pk,
-        &decrypt_args.capsule,
+        &capsule,
         verified_cfrags,
-        // Todo (nkls): ciphertext should be retreived from ipfs and not necessarily hex encoded.
-        &hex::decode(&decrypt_args.ciphertext).unwrap(),
+        &ciphertext,
     )
     .unwrap();
 
