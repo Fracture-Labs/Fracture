@@ -17,7 +17,7 @@ pub fn new_account() -> (SecretKey, PublicKey) {
 
 pub async fn encrypt(encrypt_args: EncryptArgs) -> (CIDv0, CIDv0) {
     let (capsule, ciphertext) =
-        umbral_pre::encrypt(&encrypt_args.sender_pk, &encrypt_args.plaintext.as_bytes()).unwrap();
+        umbral_pre::encrypt(&encrypt_args.sender_pk, encrypt_args.plaintext.as_bytes()).unwrap();
 
     println!("capsule: {:x}", capsule.to_array());
     println!("ciphertext: {}", hex::encode(ciphertext.clone()));
@@ -46,7 +46,7 @@ pub fn grant(grant_args: GrantArgs) -> (PublicKey, Box<[VerifiedKeyFrag]>) {
         true,
     );
 
-    for verified_kfrag in verified_kfrags.into_iter() {
+    for verified_kfrag in verified_kfrags.iter() {
         println!("kfrag: {:x}", verified_kfrag.to_array())
     }
 
