@@ -83,6 +83,7 @@ pub fn decrypt(decrypt_args: DecryptArgs) -> Box<[u8]> {
         &decrypt_args.sender_pk,
         &decrypt_args.capsule,
         verified_cfrags,
+        // Todo (nkls): ciphertext should be retreived from ipfs and not necessarily hex encoded.
         &hex::decode(&decrypt_args.ciphertext).unwrap(),
     )
     .unwrap();
