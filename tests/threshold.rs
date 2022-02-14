@@ -31,16 +31,16 @@ async fn encrypt_decrypt() {
     // Verified kfrags become non-verified kfrags when serialised (i.e. when sent over the network
     // from the sender to the proxies).
     let kfrags: Vec<KeyFrag> = verified_kfrags
-        .into_iter()
+        .iter()
         .map(|verified_kfrag| KeyFrag::from_array(&verified_kfrag.to_array()).unwrap())
         .collect();
 
     // N proxies perform re-encryption (PRE).
     let mut verified_cfrags = vec![];
-    for i in 0..SHARES {
+    for kfrag in kfrags.iter().take(SHARES) {
         let pre_args = PreArgs {
             capsule_cid: capsule_cid.clone(),
-            kfrag: kfrags[i].clone(),
+            kfrag: kfrag.clone(),
             sender_pk,
             receiver_pk,
             verifying_pk,
