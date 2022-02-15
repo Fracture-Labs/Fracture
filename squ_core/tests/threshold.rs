@@ -1,4 +1,4 @@
-use umbral_ipfs::{cli::*, commands::*};
+use squ_core::{cli::*, commands::*};
 use umbral_pre::{CapsuleFrag, DeserializableFromArray, KeyFrag, SerializableToArray};
 use umbral_ipfs::ipfs_io;
 

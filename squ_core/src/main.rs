@@ -1,5 +1,5 @@
 use clap::Parser;
-use umbral_ipfs::{
+use squ_core::{
     cli::{Cli, Commands::*},
     commands::*,
 };
