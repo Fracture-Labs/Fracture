@@ -66,7 +66,7 @@ impl InnerPreArgs {
             kfrag: pre_args.kfrag,
             sender_pk: pre_args.sender_pk,
             receiver_pk: pre_args.receiver_pk,
-            verifying_pk: pre_args.verifying_pk
+            verifying_pk: pre_args.verifying_pk,
         }
     }
 }
