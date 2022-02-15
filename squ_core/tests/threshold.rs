@@ -4,8 +4,8 @@ use umbral_pre::{CapsuleFrag, DeserializableFromArray, KeyFrag, SerializableToAr
 #[tokio::test]
 async fn encrypt_decrypt() {
     const PLAINTEXT: &str = "Threshold is cool!";
-    const THRESHOLD: usize = 2;
-    const SHARES: usize = 3;
+    const THRESHOLD: usize = 1;
+    const SHARES: usize = 2;
 
     let (sender_sk, sender_pk) = new_account();
     let (receiver_sk, receiver_pk) = new_account();
@@ -16,7 +16,8 @@ async fn encrypt_decrypt() {
         plaintext: String::from(PLAINTEXT),
     };
 
-    let (capsule_bytes, ciphertext_bytes) = encrypt(encrypt_args);
+    let inner_encrypt_args = InnerEncryptArgs::from_encrypt_args(encrypt_args);
+    let (capsule_bytes, ciphertext_bytes) = encrypt(inner_encrypt_args);
 
     // Write to ipfs.
     let capsule_cid = ipfs_io::write(capsule_bytes).await;

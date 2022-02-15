@@ -11,7 +11,8 @@ async fn main() {
             new_account();
         }
         Encrypt(encrypt_args) => {
-            encrypt(encrypt_args);
+            let inner_encrypt_args = InnerEncryptArgs::from_encrypt_args(encrypt_args);
+            encrypt(inner_encrypt_args);
         }
         Grant(grant_args) => {
             grant(grant_args);

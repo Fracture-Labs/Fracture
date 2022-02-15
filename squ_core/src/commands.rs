@@ -15,9 +15,23 @@ pub fn new_account() -> (SecretKey, PublicKey) {
     (sk, pk)
 }
 
-pub fn encrypt(encrypt_args: EncryptArgs) -> (Vec<u8>, Vec<u8>) {
+pub struct InnerEncryptArgs {
+    pub sender_pk: PublicKey,
+    pub plaintext: Vec<u8>,
+}
+
+impl InnerEncryptArgs {
+    pub fn from_encrypt_args(encrypt_args: EncryptArgs) -> Self {
+        Self {
+            sender_pk: encrypt_args.sender_pk,
+            plaintext: encrypt_args.plaintext.as_bytes().to_vec(),
+        }
+    }
+}
+
+pub fn encrypt(inner_encrypt_args: InnerEncryptArgs) -> (Vec<u8>, Vec<u8>) {
     let (capsule, ciphertext) =
-        umbral_pre::encrypt(&encrypt_args.sender_pk, encrypt_args.plaintext.as_bytes()).unwrap();
+        umbral_pre::encrypt(&inner_encrypt_args.sender_pk, &inner_encrypt_args.plaintext).unwrap();
 
     println!("capsule: {:x}", capsule.to_array());
     println!("ciphertext: {}", hex::encode(ciphertext.clone()));
