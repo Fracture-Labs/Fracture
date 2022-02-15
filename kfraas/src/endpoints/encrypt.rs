@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 pub(crate) struct EncryptRequest {
@@ -8,8 +8,8 @@ pub(crate) struct EncryptRequest {
 
 #[derive(Serialize)]
 pub(crate) struct EncryptReply {
-  pub(crate) capsule_bytes: Vec<u8>,
-  pub(crate) ciphertext: Vec<u8>
+    pub(crate) capsule_bytes: Vec<u8>,
+    pub(crate) ciphertext: Vec<u8>,
 }
 
 #[cfg(test)]
