@@ -1,10 +1,10 @@
+name: Static Analysis
+
 on:
   pull_request:
   push:
     branches:
-      - master
-
-name: basics
+      - main
 
 jobs:
   check:
