@@ -1,6 +1,6 @@
 use squ_core::{cli::*, commands::*};
 use umbral_pre::{CapsuleFrag, DeserializableFromArray, KeyFrag, SerializableToArray};
-use umbral_ipfs::ipfs_io;
+use squ_core::ipfs_io;
 
 #[tokio::test]
 async fn encrypt_decrypt() {

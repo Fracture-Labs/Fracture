@@ -3,7 +3,7 @@ use squ_core::{
     cli::{Cli, Commands::*},
     commands::*,
 };
-use umbral_ipfs::commands::InnerPreArgs;
+use squ_core::commands::InnerPreArgs;
 
 #[tokio::main]
 async fn main() {
