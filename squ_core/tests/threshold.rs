@@ -1,5 +1,4 @@
-use squ_core::ipfs_io;
-use squ_core::{cli::*, commands::*};
+use squ_core::{cli::*, commands::*, ipfs_io};
 use umbral_pre::{CapsuleFrag, DeserializableFromArray, KeyFrag, SerializableToArray};
 
 #[tokio::test]

@@ -1,8 +1,7 @@
 use clap::Parser;
-use squ_core::commands::InnerPreArgs;
 use squ_core::{
     cli::{Cli, Commands::*},
-    commands::*,
+    commands::{InnerPreArgs, *},
 };
 
 #[tokio::main]
