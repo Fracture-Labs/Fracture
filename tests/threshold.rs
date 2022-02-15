@@ -1,5 +1,6 @@
 use umbral_ipfs::{cli::*, commands::*};
 use umbral_pre::{CapsuleFrag, DeserializableFromArray, KeyFrag, SerializableToArray};
+use umbral_ipfs::ipfs_io;
 
 #[tokio::test]
 async fn encrypt_decrypt() {
@@ -16,7 +17,11 @@ async fn encrypt_decrypt() {
         plaintext: String::from(PLAINTEXT),
     };
 
-    let (capsule_cid, ciphertext_cid) = encrypt(encrypt_args).await;
+    let (capsule_bytes, ciphertext_bytes) = encrypt(encrypt_args).await;
+
+    // Write to ipfs.
+    let capsule_cid = ipfs_io::write(capsule_bytes).await;
+    let ciphertext_cid = ipfs_io::write(ciphertext_bytes).await;
 
     // Create the key fragments and distribute them to each proxy.
     let grant_args = GrantArgs {
@@ -46,7 +51,8 @@ async fn encrypt_decrypt() {
             verifying_pk,
         };
 
-        let verified_cfrag = pre(pre_args).await;
+        let inner_pre_args = InnerPreArgs::from_pre_args(pre_args).await;
+        let verified_cfrag = pre(inner_pre_args).await;
 
         verified_cfrags.push(verified_cfrag);
     }

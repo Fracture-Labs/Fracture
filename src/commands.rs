@@ -2,7 +2,7 @@ use umbral_pre::*;
 
 use crate::{
     cli::{DecryptArgs, EncryptArgs, GrantArgs, PreArgs},
-    ipfs_io::{self, CIDv0},
+    ipfs_io::{self},
 };
 
 pub fn new_account() -> (SecretKey, PublicKey) {
@@ -15,18 +15,14 @@ pub fn new_account() -> (SecretKey, PublicKey) {
     (sk, pk)
 }
 
-pub async fn encrypt(encrypt_args: EncryptArgs) -> (CIDv0, CIDv0) {
+pub async fn encrypt(encrypt_args: EncryptArgs) -> (Vec<u8>, Vec<u8>) {
     let (capsule, ciphertext) =
         umbral_pre::encrypt(&encrypt_args.sender_pk, encrypt_args.plaintext.as_bytes()).unwrap();
 
     println!("capsule: {:x}", capsule.to_array());
     println!("ciphertext: {}", hex::encode(ciphertext.clone()));
 
-    // Write to ipfs.
-    let capsule_cid = ipfs_io::write(capsule.to_array().to_vec()).await;
-    let ciphertext_cid = ipfs_io::write(ciphertext.to_vec()).await;
-
-    (capsule_cid, ciphertext_cid)
+    (capsule.to_array().to_vec(), ciphertext.to_vec())
 }
 
 pub fn grant(grant_args: GrantArgs) -> (PublicKey, Box<[VerifiedKeyFrag]>) {
@@ -53,18 +49,40 @@ pub fn grant(grant_args: GrantArgs) -> (PublicKey, Box<[VerifiedKeyFrag]>) {
     (verifying_pk, verified_kfrags)
 }
 
-pub async fn pre(pre_args: PreArgs) -> VerifiedCapsuleFrag {
-    let verified_kfrag = pre_args
+pub struct InnerPreArgs {
+    pub capsule_bytes: Vec<u8>,
+    pub kfrag: KeyFrag,
+    pub sender_pk: PublicKey,
+    pub receiver_pk: PublicKey,
+    pub verifying_pk: PublicKey,
+}
+
+impl InnerPreArgs {
+    pub async fn from_pre_args(pre_args: PreArgs) -> InnerPreArgs {
+        let capsule_bytes = ipfs_io::read(pre_args.capsule_cid).await;
+
+        InnerPreArgs {
+            capsule_bytes,
+            kfrag: pre_args.kfrag,
+            sender_pk: pre_args.sender_pk,
+            receiver_pk: pre_args.receiver_pk,
+            verifying_pk: pre_args.verifying_pk
+        }
+    }
+}
+
+pub async fn pre(inner_pre_args: InnerPreArgs) -> VerifiedCapsuleFrag {
+    let verified_kfrag = inner_pre_args
         .kfrag
         .verify(
-            &pre_args.verifying_pk,
-            Some(&pre_args.sender_pk),
-            Some(&pre_args.receiver_pk),
+            &inner_pre_args.verifying_pk,
+            Some(&inner_pre_args.sender_pk),
+            Some(&inner_pre_args.receiver_pk),
         )
         .unwrap();
 
     // Read data from ipfs.
-    let capsule = Capsule::from_bytes(ipfs_io::read(pre_args.capsule_cid).await).unwrap();
+    let capsule = Capsule::from_bytes(&inner_pre_args.capsule_bytes).unwrap();
 
     // Generate the capsule fragments.
     let verified_cfrag = reencrypt(&capsule, verified_kfrag);

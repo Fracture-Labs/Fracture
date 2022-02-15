@@ -3,6 +3,7 @@ use umbral_ipfs::{
     cli::{Cli, Commands::*},
     commands::*,
 };
+use umbral_ipfs::commands::InnerPreArgs;
 
 #[tokio::main]
 async fn main() {
@@ -17,7 +18,8 @@ async fn main() {
             grant(grant_args);
         }
         Pre(pre_args) => {
-            pre(pre_args).await;
+            let inner_pre_args = InnerPreArgs::from_pre_args(pre_args).await;
+            pre(inner_pre_args).await;
         }
         Decrypt(decrypt_args) => {
             decrypt(decrypt_args).await;
