@@ -19,4 +19,7 @@ jobs:
     - name: Build
       run: cargo build --workspace
     - name: Run tests
-      run: cargo test --workspace
+      run: |
+        docker run -d --name ipfs_host -p 127.0.0.1:5001:5001 ipfs/go-ipfs:v0.11.0
+        cargo test --workspace
+        docker stop ipfs_host
