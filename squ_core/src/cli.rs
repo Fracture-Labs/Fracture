@@ -73,7 +73,7 @@ pub struct DecryptArgs {
 
 // Helpers
 // TODO (nkls): error handling + dedup with macro
-fn public_key_from_str(s: &str) -> Result<PublicKey, &'static str> {
+pub fn public_key_from_str(s: &str) -> Result<PublicKey, &'static str> {
     match PublicKey::from_bytes(&hex::decode(s).unwrap()) {
         Ok(pk) => Ok(pk),
         Err(_) => Err("couldn't deserialize"),
