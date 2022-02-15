@@ -16,7 +16,7 @@ async fn encrypt_decrypt() {
         plaintext: String::from(PLAINTEXT),
     };
 
-    let (capsule_bytes, ciphertext_bytes) = encrypt(encrypt_args).await;
+    let (capsule_bytes, ciphertext_bytes) = encrypt(encrypt_args);
 
     // Write to ipfs.
     let capsule_cid = ipfs_io::write(capsule_bytes).await;
@@ -51,7 +51,7 @@ async fn encrypt_decrypt() {
         };
 
         let inner_pre_args = InnerPreArgs::from_pre_args(pre_args).await;
-        let verified_cfrag = pre(inner_pre_args).await;
+        let verified_cfrag = pre(inner_pre_args);
 
         verified_cfrags.push(verified_cfrag);
     }
@@ -73,7 +73,8 @@ async fn encrypt_decrypt() {
         verifying_pk,
     };
 
-    let plaintext = decrypt(decrypt_args).await;
+    let inner_decrypt_args = InnerDecryptArgs::from_decrypt_args(decrypt_args).await;
+    let plaintext = decrypt(inner_decrypt_args);
 
     assert_eq!(*plaintext, *PLAINTEXT.as_bytes());
 }
