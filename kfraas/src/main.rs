@@ -1,5 +1,5 @@
 use squ_core::{
-    cli::{public_key_from_str, EncryptArgs},
+    cli::{public_key_from_str},
     commands::*,
 };
 use umbral_pre::{PublicKey, SecretKey};
@@ -27,9 +27,9 @@ async fn main() {
         .and(warp::body::json())
         .map(|encrypt_request: EncryptRequest| {
             let sender_pk = public_key_from_str(&encrypt_request.sender_pk).unwrap();
-            let (capsule_bytes, ciphertext) = encrypt(EncryptArgs {
+            let (capsule_bytes, ciphertext) = encrypt(InnerEncryptArgs {
                 sender_pk,
-                plaintext: encrypt_request.plaintext,
+                plaintext: encrypt_request.plaintext.as_bytes().to_vec(),
             });
             warp::reply::json(&EncryptReply {
                 capsule_bytes,
