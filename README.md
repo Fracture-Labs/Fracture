@@ -39,6 +39,34 @@ Since the design of the solution, we have found that use cases for this solution
 
 ![flowdiagram](assets/fracture.png)
 
+### Param table
+
+Prefix convention: 
+- `d_`: relating to the encrypted data
+- `k_`: relating to the encrypted `d_sk`
+- `t_`: relating to the trustees
+- `s_`: relating to the server
+- `p_`: relating to the proxies
+
+
+| Param            | Created By     | Stored By                                            |
+| ---------------- | -------------- | ---------------------------------------------------- |
+| d_sk             | Freddie        | Kfraas                                               |
+| d_pk             | Freddie        | Kfraas, Bob                                          |
+| d_verifying_pk   | Kfraas         | passed to Trustees, then to Proxies                  |
+| d_kfrags         | Kfraas         | passed to Trustees, then to Proxies                  |
+| d_cfrags         | Proxies        | passed to Bob                                        |
+| d_capsule_cid    | Freddie (ipfs) | Trustees                                             |
+| d_ciphertext_cid | Freddie (ipfs) | Trustees                                             |
+| k_sk             | Freddie        | Kfraas, Bob                                          |
+| k_pk             | Freddie        | Kfraas, Trustees                                     |
+| k_verifying_pk   | Freddie        | Kfraas, Trustees                                     |
+| k_kfrags         | Freddie        | passed to Trustees                                   |
+| k_cfrags         | Freddie        | passed to Kfraas                                     |
+| t_pk             | Trustee        | Freddie (until k_kfrags have been created), Kfraas   |
+| s_pk             | Kfraas         | Freddie (until k_kfrags have been created), Trustees |
+| b_pk             | Bob            | Kfraas, Proxies                                      |
+
 # Client
 
 > Implementing the Umbral threshold proxy re-encryption scheme with IPFS
