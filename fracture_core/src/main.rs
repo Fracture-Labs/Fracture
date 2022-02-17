@@ -1,5 +1,5 @@
 use clap::Parser;
-use squ_core::{
+use fracture_core::{
     cli::{Cli, Commands::*},
     commands::{InnerPreArgs, *},
 };

@@ -367,6 +367,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "fracture_core"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "futures",
+ "hex",
+ "ipfs-api-backend-hyper",
+ "tokio",
+ "umbral-pre",
+]
+
+[[package]]
+name = "fracture_kfraas"
+version = "0.1.0"
+dependencies = [
+ "fracture_core",
+ "serde",
+ "serde_json",
+ "tokio",
+ "umbral-pre",
+ "warp",
+]
+
+[[package]]
 name = "futures"
 version = "0.3.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -746,18 +770,6 @@ dependencies = [
  "ecdsa",
  "elliptic-curve",
  "sec1",
-]
-
-[[package]]
-name = "kfraas"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "squ_core",
- "tokio",
- "umbral-pre",
- "warp",
 ]
 
 [[package]]
@@ -1312,18 +1324,6 @@ checksum = "66d72b759436ae32898a2af0a14218dbf55efde3feeb170eb623637db85ee1e0"
 dependencies = [
  "libc",
  "winapi",
-]
-
-[[package]]
-name = "squ_core"
-version = "0.1.0"
-dependencies = [
- "clap",
- "futures",
- "hex",
- "ipfs-api-backend-hyper",
- "tokio",
- "umbral-pre",
 ]
 
 [[package]]

@@ -1,4 +1,4 @@
-use squ_core::{cli::public_key_from_str, commands::*};
+use fracture_core::{cli::public_key_from_str, commands::*};
 use umbral_pre::{PublicKey, SecretKey};
 use warp::{http::Response, hyper::Body, Filter};
 

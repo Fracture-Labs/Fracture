@@ -1,4 +1,4 @@
-use squ_core::{cli::*, commands::*, ipfs_io};
+use fracture_core::{cli::*, commands::*, ipfs_io};
 use umbral_pre::{CapsuleFrag, DeserializableFromArray, KeyFrag, SerializableToArray};
 
 #[tokio::test]

@@ -1,4 +1,4 @@
-use squ_core::{
+use fracture_core::{
     cli::*,
     commands,
     ipfs_io::{self, CIDv0},
