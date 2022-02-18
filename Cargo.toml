@@ -1,5 +1,6 @@
 [workspace]
 members = [
-    "fracture_kfraas",
+    "fracture_client",
     "fracture_core",
+    "fracture_kfraas",
 ]
