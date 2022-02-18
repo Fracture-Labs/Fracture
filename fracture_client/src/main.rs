@@ -1,7 +1,10 @@
 #[macro_use]
 extern crate rocket;
 
-use rocket::serde::json::Json;
+use std::collections::HashMap;
+
+use reqwest::Client;
+use rocket::{serde::json::Json, Config};
 use serde::{Deserialize, Serialize};
 
 const D_THRESHOLD: usize = 1;
@@ -39,7 +42,23 @@ async fn encrypt(data: Json<Data>) {
 
     let (k_capsule, k_ciphertext) = fracture_core::commands::encrypt(encrypt_args);
 
-    // TODO: send k_capsule, k_ciphertext, k_pk, k_verifying_pk and a map of d_pk to t_pks to the kfraas, get s_pk back.
+    // TODO: send k_capsule, k_ciphertext, k_pk, k_verifying_pk, get s_pk back.
+    let mut data = HashMap::new();
+    data.insert("k_capsule", "k_capsule");
+    data.insert("k_ciphertext", "k_ciphertext");
+    data.insert("k_pk", "k_pk");
+    data.insert("k_verifying_pk", "k_verifying_pk");
+
+    let s_pk = Client::new()
+        .post("http://127.0.0.1:8001/set_k")
+        .json(&data)
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+
     let (s_sk, s_pk) = fracture_core::commands::new_account();
 
     // Generate the k_kfrags with s_pk.
@@ -52,15 +71,22 @@ async fn encrypt(data: Json<Data>) {
 
     let (k_verifying_pk, k_verified_kfrags) = fracture_core::commands::grant(grant_args);
 
-    // TODO: send the k_kfrags to the proxies.
+    // TODO: send the k_kfrags to the trustees.
 }
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![index, encrypt])
+    let config = Config {
+        port: 8000,
+        ..Config::debug_default()
+    };
+
+    rocket::custom(&config).mount("/", routes![index, encrypt])
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Data {
     plaintext: String,
 }
+
+struct MemStore {}

@@ -1,48 +1,35 @@
+#[macro_use]
+extern crate rocket;
+
 use fracture_core::{cli::public_key_from_str, commands::*};
+use rocket::{serde::json::Json, Config};
+use serde::{Deserialize, Serialize};
 use umbral_pre::{PublicKey, SecretKey};
-use warp::{http::Response, hyper::Body, Filter};
 
-mod endpoints;
-use endpoints::encrypt::{EncryptReply, EncryptRequest};
-
-struct KeyPair((SecretKey, PublicKey));
-
-impl warp::Reply for KeyPair {
-    fn into_response(self) -> Response<Body> {
-        Response::default()
-    }
+#[get("/")]
+fn index() -> &'static str {
+    "Hello Constitution, this is Fracture KFRAAS!"
 }
 
-#[tokio::main]
-async fn main() {
-    // let account = warp::post()
-    //     .and(warp::path("account"))
-    //     .map(|| new_account());
+#[post("/set_k", data = "<data>")]
+fn set_k(data: Json<SetKData>) -> String {
+    String::from("Dude, this is the s_pk!")
+}
 
-    let encrypt = warp::post()
-        .and(warp::path("encrypt"))
-        .and(warp::body::json())
-        .map(|encrypt_request: EncryptRequest| {
-            let sender_pk = public_key_from_str(&encrypt_request.sender_pk).unwrap();
-            let (capsule_bytes, ciphertext) = encrypt(InnerEncryptArgs {
-                sender_pk,
-                plaintext: encrypt_request.plaintext.as_bytes().to_vec(),
-            });
-            warp::reply::json(&EncryptReply {
-                capsule_bytes,
-                ciphertext,
-            })
-        });
+#[launch]
+fn rocket() -> _ {
+    let config = Config {
+        port: 8001,
+        ..Config::debug_default()
+    };
 
-    // let grant = warp::post()
-    //     .and(warp::path("grant"))
-    //     .map(|grant_args| grant(grant_args));
-    // let pre = warp::post()
-    //     .and(warp::path("pre"))
-    //     .map(|pre_args| pre(pre_args));
-    // let decrypt = warp::post()
-    //     .and(warp::path("decrypt"))
-    //     .map(|decrypt_args| decrypt(decrypt_args));
+    rocket::custom(&config).mount("/", routes![index, set_k])
+}
 
-    warp::serve(encrypt).run(([127, 0, 0, 1], 3030)).await;
+#[derive(Serialize, Deserialize, Debug)]
+struct SetKData {
+    k_capsule: String,
+    k_ciphertext: String,
+    k_pk: String,
+    k_verifying_pk: String,
 }
