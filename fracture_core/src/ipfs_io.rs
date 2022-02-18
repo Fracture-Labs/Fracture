@@ -1,32 +1,47 @@
-use std::io::Cursor;
-
-use futures::TryStreamExt;
-use ipfs_api_backend_hyper::{IpfsApi, IpfsClient};
+use reqwest::{multipart::Part, Client};
+use serde::{Deserialize, Serialize};
 
 pub type CIDv0 = String;
 
-pub async fn write(bytes: Vec<u8>) -> CIDv0 {
-    let client = IpfsClient::default();
-    let data = Cursor::new(bytes);
+#[derive(Serialize, Deserialize)]
+pub struct AddResponse {
+    #[serde(rename = "Name")]
+    name: String,
+    #[serde(rename = "Hash")]
+    hash: CIDv0,
+    #[serde(rename = "Size")]
+    size: String,
+}
 
-    match client.add(data).await {
-        Ok(res) => res.hash,
-        Err(e) => panic!("error adding file: {}", e),
-    }
+pub async fn write(bytes: Vec<u8>) -> CIDv0 {
+    let form = reqwest::multipart::Form::new().part("arg", Part::bytes(bytes));
+
+    let data = Client::new()
+        .post("http://127.0.0.1:5001/api/v0/add")
+        // .header("Content-Type", "multipart/form-data")
+        .multipart(form)
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+
+    let add_response: AddResponse = serde_json::from_str(&data).unwrap();
+
+    add_response.hash
 }
 
 pub async fn read(cid: CIDv0) -> Vec<u8> {
-    let client = IpfsClient::default();
-
-    match client
-        .cat(&cid)
-        .map_ok(|chunk| chunk.to_vec())
-        .try_concat()
+    Client::new()
+        .post(format!("http://127.0.0.1:5001/api/v0/cat?arg={}", cid))
+        .send()
         .await
-    {
-        Ok(res) => res,
-        Err(e) => panic!("error getting CID: {}", e),
-    }
+        .unwrap()
+        .bytes()
+        .await
+        .unwrap()
+        .to_vec()
 }
 
 #[cfg(test)]
