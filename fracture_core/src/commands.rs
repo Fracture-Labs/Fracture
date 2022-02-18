@@ -15,6 +15,13 @@ pub fn new_account() -> (SecretKey, PublicKey) {
     (sk, pk)
 }
 
+pub fn new_signer() -> (Signer, PublicKey) {
+    let signer = umbral_pre::Signer::new(SecretKey::random());
+    let verifying_pk = signer.verifying_key();
+
+    (signer, verifying_pk)
+}
+
 pub struct InnerEncryptArgs {
     pub sender_pk: PublicKey,
     pub plaintext: Vec<u8>,
@@ -61,6 +68,24 @@ pub fn grant(grant_args: GrantArgs) -> (PublicKey, Box<[VerifiedKeyFrag]>) {
     }
 
     (verifying_pk, verified_kfrags)
+}
+
+pub fn grant_with_signer(signer: &Signer, grant_args: GrantArgs) -> Box<[VerifiedKeyFrag]> {
+    let verified_kfrags = generate_kfrags(
+        &grant_args.sender_sk,
+        &grant_args.receiver_pk,
+        signer,
+        grant_args.threshold,
+        grant_args.shares,
+        true,
+        true,
+    );
+
+    for verified_kfrag in verified_kfrags.iter() {
+        println!("kfrag: {:x}", verified_kfrag.to_array())
+    }
+
+    verified_kfrags
 }
 
 pub struct InnerPreArgs {
