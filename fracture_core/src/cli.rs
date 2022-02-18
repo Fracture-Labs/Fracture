@@ -1,7 +1,10 @@
 use clap::{Parser, Subcommand};
 use umbral_pre::*;
 
-use crate::ipfs_io::CIDv0;
+use crate::{
+    helpers::{capsule_frag_from_str, key_frag_from_str, public_key_from_str, secret_key_from_str},
+    ipfs_io::CIDv0,
+};
 
 #[derive(Parser)]
 pub struct Cli {
@@ -69,34 +72,4 @@ pub struct DecryptArgs {
     pub receiver_pk: PublicKey,
     #[clap(long, parse(try_from_str = public_key_from_str))]
     pub verifying_pk: PublicKey,
-}
-
-// Helpers
-// TODO (nkls): error handling + dedup with macro
-pub fn public_key_from_str(s: &str) -> Result<PublicKey, &'static str> {
-    match PublicKey::from_bytes(&hex::decode(s).unwrap()) {
-        Ok(pk) => Ok(pk),
-        Err(_) => Err("couldn't deserialize"),
-    }
-}
-
-fn secret_key_from_str(s: &str) -> Result<SecretKey, &'static str> {
-    match SecretKey::from_bytes(&hex::decode(s).unwrap()) {
-        Ok(sk) => Ok(sk),
-        Err(_) => Err("couldn't deserialize"),
-    }
-}
-
-fn key_frag_from_str(s: &str) -> Result<KeyFrag, &'static str> {
-    match KeyFrag::from_bytes(&hex::decode(s).unwrap()) {
-        Ok(kfrag) => Ok(kfrag),
-        Err(_) => Err("couldn't deserialize"),
-    }
-}
-
-fn capsule_frag_from_str(s: &str) -> Result<CapsuleFrag, &'static str> {
-    match CapsuleFrag::from_bytes(&hex::decode(s).unwrap()) {
-        Ok(cfrag) => Ok(cfrag),
-        Err(_) => Err("couldn't deserialize"),
-    }
 }
