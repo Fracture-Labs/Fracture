@@ -23,6 +23,9 @@ async fn encrypt(data: Json<Data>) {
     let (d_sk, d_pk) = fracture_core::commands::new_account();
     let (k_sk, k_pk) = fracture_core::commands::new_account();
 
+    // Create the signer for the k_kfrags.
+    let (k_signer, k_verifying_pk) = fracture_core::commands::new_signer();
+
     // Freddie encrypts the sensitive data and stores it on ipfs.
     let inner_encrypt_args = fracture_core::commands::InnerEncryptArgs {
         sender_pk: d_pk,
@@ -42,14 +45,20 @@ async fn encrypt(data: Json<Data>) {
 
     let (k_capsule, k_ciphertext) = fracture_core::commands::encrypt(encrypt_args);
 
-    // TODO: send k_capsule, k_ciphertext, k_pk, k_verifying_pk, get s_pk back.
+    // Send k_capsule, k_ciphertext, k_pk, k_verifying_pk to kfraas, get s_pk back.
     let mut data = HashMap::new();
-    data.insert("k_capsule", "k_capsule");
-    data.insert("k_ciphertext", "k_ciphertext");
-    data.insert("k_pk", "k_pk");
-    data.insert("k_verifying_pk", "k_verifying_pk");
+    data.insert("k_capsule", hex::encode(k_capsule));
+    data.insert("k_ciphertext", hex::encode(k_ciphertext));
+    data.insert(
+        "k_pk",
+        hex::encode(fracture_core::helpers::pk_to_bytes(k_pk)),
+    );
+    data.insert(
+        "k_verifying_pk",
+        hex::encode(fracture_core::helpers::pk_to_bytes(k_verifying_pk)),
+    );
 
-    let s_pk = Client::new()
+    let s_pk_string = Client::new()
         .post("http://127.0.0.1:8001/set_k")
         .json(&data)
         .send()
@@ -59,7 +68,9 @@ async fn encrypt(data: Json<Data>) {
         .await
         .unwrap();
 
-    let (s_sk, s_pk) = fracture_core::commands::new_account();
+    // Decode the hex encoded s_pk.
+    let s_pk = fracture_core::helpers::public_key_from_str(&s_pk_string).unwrap();
+    // println!("S_PK: {}", &s_pk);
 
     // Generate the k_kfrags with s_pk.
     let grant_args = fracture_core::cli::GrantArgs {
@@ -69,7 +80,7 @@ async fn encrypt(data: Json<Data>) {
         shares: K_SHARES,
     };
 
-    let (k_verifying_pk, k_verified_kfrags) = fracture_core::commands::grant(grant_args);
+    let k_verified_kfrags = fracture_core::commands::grant_with_signer(&k_signer, grant_args);
 
     // TODO: send the k_kfrags to the trustees.
 }
