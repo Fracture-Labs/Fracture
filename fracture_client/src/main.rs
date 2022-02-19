@@ -89,6 +89,10 @@ async fn encrypt(data: Json<EncryptData>) {
     data.insert("d_ciphertext_cid", d_ciphertext_cid);
     data.insert("k_capsule", hex::encode(k_capsule));
     data.insert(
+        "d_pk",
+        hex::encode(fracture_core::helpers::pk_to_bytes(d_pk)),
+    );
+    data.insert(
         "k_kfrag",
         hex::encode(fracture_core::helpers::verified_kfrag_to_bytes(
             k_verified_kfrags[0].clone(),
@@ -149,6 +153,30 @@ async fn decrypt(memstore: &State<MemStore>) {
         .unwrap();
 }
 
+#[post("/decrypt_w_cfrag", data = "<data>")]
+async fn decrypt_w_cfrag(data: Json<DecryptWCfragData>, memstore: &State<MemStore>) {
+    let decrypt_args = fracture_core::cli::DecryptArgs {
+        capsule_cid: data.d_capsule_cid.clone(),
+        ciphertext_cid: data.d_ciphertext_cid.clone(),
+        cfrags: vec![fracture_core::helpers::capsule_frag_from_str(&data.d_cfrag).unwrap()],
+        sender_pk: fracture_core::helpers::public_key_from_str(&data.d_pk).unwrap(),
+        receiver_sk: fracture_core::helpers::secret_key_from_str(
+            memstore.kv.read().get("b_sk").unwrap(),
+        )
+        .unwrap(),
+        receiver_pk: fracture_core::helpers::public_key_from_str(
+            memstore.kv.read().get("b_pk").unwrap(),
+        )
+        .unwrap(),
+        verifying_pk: fracture_core::helpers::public_key_from_str(&data.d_verifying_pk).unwrap(),
+    };
+
+    let inner_decrypt_args = fracture_core::commands::InnerDecryptArgs::from_decrypt_args(decrypt_args).await;
+    let plaintext = fracture_core::commands::decrypt(inner_decrypt_args);
+
+    println!("PLAINTEXT: {}", String::from_utf8_lossy(&plaintext));
+}
+
 //
 // Trustee endpoints
 //
@@ -168,6 +196,7 @@ async fn set_k_kfrags(data: Json<KfragData>, memstore: &State<MemStore>) {
         "d_ciphertext_cid".to_string(),
         data.d_ciphertext_cid.clone(),
     );
+    memstore_wg.insert("d_pk".to_string(), data.d_pk.clone());
     memstore_wg.insert("k_capsule".to_string(), data.k_capsule.clone());
     memstore_wg.insert("k_kfrag".to_string(), data.k_kfrag.clone());
     memstore_wg.insert("k_pk".to_string(), data.k_pk.clone());
@@ -213,7 +242,7 @@ async fn send_cfrag(memstore: &State<MemStore>) {
 
     let verified_k_cfrag = fracture_core::commands::pre(inner_pre_args);
 
-    // Send the cfrag to the kfraas.
+    // Send the k_cfrag to the kfraas.
     let mut data = HashMap::new();
     data.insert(
         "k_cfrag",
@@ -231,6 +260,77 @@ async fn send_cfrag(memstore: &State<MemStore>) {
         .unwrap();
 }
 
+#[post("/forward_d_kfrag", data = "<data>")]
+async fn forward_d_kfrag(data: Json<ForwardKfragData>, memstore: &State<MemStore>) {
+    // Add the cid to the data to be forwarded to the proxies.
+
+    let out_data = {
+        let memstore_rg = memstore.kv.read();
+
+        let mut out_data = HashMap::new();
+        out_data.insert(
+            "d_capsule_cid",
+            memstore_rg.get("d_capsule_cid").unwrap().clone(),
+        );
+        out_data.insert(
+            "d_ciphertext_cid",
+            memstore_rg.get("d_ciphertext_cid").unwrap().clone(),
+        );
+        out_data.insert("d_pk", memstore_rg.get("d_pk").unwrap().clone());
+        out_data.insert("d_verifying_pk", data.d_verifying_pk.clone());
+        out_data.insert("d_kfrag", data.d_kfrag.clone());
+        out_data.insert("b_pk", memstore_rg.get("b_pk").unwrap().clone());
+
+        out_data
+    };
+
+    // Send the data to the proxies.
+    Client::new()
+        .post("http://127.0.0.1:8003/set_d_cfrag")
+        .json(&out_data)
+        .send()
+        .await
+        .unwrap();
+}
+
+// Proxy
+
+#[post("/set_d_cfrag", data = "<data>")]
+async fn set_d_cfrag(data: Json<SetCfragData>) {
+    // TODO: store the d_kfrag, check the threshold, if all fragements have been received, generate
+    // cfrags and forward them to Bob (in this case Freddie).
+
+    let pre_args = fracture_core::cli::PreArgs {
+        capsule_cid: data.d_capsule_cid.clone(),
+        kfrag: fracture_core::helpers::key_frag_from_str(&data.d_kfrag).unwrap(),
+        sender_pk: fracture_core::helpers::public_key_from_str(&data.d_pk).unwrap(),
+        receiver_pk: fracture_core::helpers::public_key_from_str(&data.b_pk).unwrap(),
+        verifying_pk: fracture_core::helpers::public_key_from_str(&data.d_verifying_pk).unwrap(),
+    };
+
+    let inner_pre_args = fracture_core::commands::InnerPreArgs::from_pre_args(pre_args).await;
+    let d_verified_cfrag = fracture_core::commands::pre(inner_pre_args);
+
+    // Send the cfrag to the decryptor, in this case Freddie.
+    let mut out_data = HashMap::new();
+    out_data.insert("d_capsule_cid", data.d_capsule_cid.clone());
+    out_data.insert("d_ciphertext_cid", data.d_ciphertext_cid.clone());
+    out_data.insert("d_pk", data.d_pk.clone());
+    out_data.insert("d_verifying_pk", data.d_verifying_pk.clone());
+    out_data.insert(
+        "d_cfrag",
+        hex::encode(fracture_core::helpers::verified_cfrag_to_bytes(
+            d_verified_cfrag,
+        )),
+    );
+    Client::new()
+        .post("http://127.0.0.1:8000/decrypt_w_cfrag")
+        .json(&out_data)
+        .send()
+        .await
+        .unwrap();
+}
+
 #[cfg(feature = "client")]
 #[launch]
 fn rocket() -> _ {
@@ -241,7 +341,7 @@ fn rocket() -> _ {
 
     rocket::custom(&config)
         .manage(MemStore::new())
-        .mount("/", routes![index, encrypt, decrypt])
+        .mount("/", routes![index, encrypt, decrypt, decrypt_w_cfrag])
 }
 
 #[cfg(feature = "trustee")]
@@ -260,8 +360,28 @@ fn rocket() -> _ {
 
     rocket::custom(&config).manage(memstore).mount(
         "/",
-        routes![index, set_k_kfrags, status, set_decrypt, send_cfrag],
+        routes![
+            index,
+            set_k_kfrags,
+            status,
+            set_decrypt,
+            send_cfrag,
+            forward_d_kfrag
+        ],
     )
+}
+
+#[cfg(feature = "proxy")]
+#[launch]
+fn rocket() -> _ {
+    let config = Config {
+        port: 8003,
+        ..Config::debug_default()
+    };
+
+    rocket::custom(&config)
+        .manage(MemStore::new())
+        .mount("/", routes![index, set_d_cfrag])
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -273,6 +393,7 @@ struct EncryptData {
 struct KfragData {
     d_capsule_cid: String,
     d_ciphertext_cid: String,
+    d_pk: String,
     k_capsule: String,
     k_kfrag: String,
     k_pk: String,
@@ -291,6 +412,33 @@ struct StatusData {
 #[derive(Serialize, Deserialize, Debug)]
 struct DecryptData {
     b_pk: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ForwardKfragData {
+    d_verifying_pk: String,
+    d_kfrag: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct SetCfragData {
+    d_capsule_cid: String,
+    // TODO: this should probably not get sent to the proxies here but rather straight to
+    // bob.
+    d_ciphertext_cid: String,
+    d_pk: String,
+    d_verifying_pk: String,
+    d_kfrag: String,
+    b_pk: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct DecryptWCfragData {
+    d_capsule_cid: String,
+    d_ciphertext_cid: String,
+    d_pk: String,
+    d_verifying_pk: String,
+    d_cfrag: String,
 }
 
 struct MemStore {

@@ -9,9 +9,6 @@ use umbral_pre::*;
 async fn e2e() {
     const PLAINTEXT: &str = "Threshold is cool!";
 
-    const D_THRESHOLD: usize = 1;
-    const D_SHARES: usize = 2;
-
     const K_THRESHOLD: usize = 1;
     const K_SHARES: usize = 2;
 

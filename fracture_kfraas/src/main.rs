@@ -3,8 +3,12 @@ extern crate rocket;
 
 use std::{collections::HashMap, sync::Arc};
 
+const D_THRESHOLD: usize = 1;
+const D_SHARES: usize = 2;
+
 use fracture_core::{commands::*, helpers::public_key_from_str};
 use parking_lot::RwLock;
+use reqwest::Client;
 use rocket::{serde::json::Json, Config, State};
 use serde::{Deserialize, Serialize};
 use umbral_pre::{DeserializableFromArray, PublicKey, SecretKey};
@@ -36,24 +40,32 @@ async fn set_cfrag(data: Json<CfragData>, memstore: &State<MemStore>) {
     // TODO: query DAO
 
     // Decrypt d_sk.
-    let memstore_rg = memstore.kv.read();
-    let inner_decrypt_args = fracture_core::commands::InnerDecryptArgs {
-        capsule_bytes: hex::decode(memstore_rg.get("k_capsule").unwrap()).unwrap(),
-        ciphertext: hex::decode(memstore_rg.get("k_ciphertext").unwrap()).unwrap(),
-        cfrags: vec![fracture_core::helpers::capsule_frag_from_str(
-            memstore_rg.get("k_cfrag").unwrap(),
-        )
-        .unwrap()],
-        sender_pk: fracture_core::helpers::public_key_from_str(memstore_rg.get("k_pk").unwrap())
+    let inner_decrypt_args = {
+        let memstore_rg = memstore.kv.read();
+        fracture_core::commands::InnerDecryptArgs {
+            capsule_bytes: hex::decode(memstore_rg.get("k_capsule").unwrap()).unwrap(),
+            ciphertext: hex::decode(memstore_rg.get("k_ciphertext").unwrap()).unwrap(),
+            cfrags: vec![fracture_core::helpers::capsule_frag_from_str(
+                memstore_rg.get("k_cfrag").unwrap(),
+            )
+            .unwrap()],
+            sender_pk: fracture_core::helpers::public_key_from_str(
+                memstore_rg.get("k_pk").unwrap(),
+            )
             .unwrap(),
-        receiver_sk: fracture_core::helpers::secret_key_from_str(memstore_rg.get("s_sk").unwrap())
+            receiver_sk: fracture_core::helpers::secret_key_from_str(
+                memstore_rg.get("s_sk").unwrap(),
+            )
             .unwrap(),
-        receiver_pk: fracture_core::helpers::public_key_from_str(memstore_rg.get("s_pk").unwrap())
+            receiver_pk: fracture_core::helpers::public_key_from_str(
+                memstore_rg.get("s_pk").unwrap(),
+            )
             .unwrap(),
-        verifying_pk: fracture_core::helpers::public_key_from_str(
-            memstore_rg.get("k_verifying_pk").unwrap(),
-        )
-        .unwrap(),
+            verifying_pk: fracture_core::helpers::public_key_from_str(
+                memstore_rg.get("k_verifying_pk").unwrap(),
+            )
+            .unwrap(),
+        }
     };
 
     // Decrypt the d_sk.
@@ -62,7 +74,40 @@ async fn set_cfrag(data: Json<CfragData>, memstore: &State<MemStore>) {
 
     println!("SECRET_KEY: {}", hex::encode(d_sk_bytes));
 
-    // Generate the kfrags for the data.
+    // Generate the kfrags for the data and send to trustees.
+    let grant_args = fracture_core::cli::GrantArgs {
+        sender_sk: d_sk,
+        receiver_pk: fracture_core::helpers::public_key_from_str(
+            memstore.kv.read().get("b_pk").unwrap(),
+        )
+        .unwrap(),
+        threshold: D_THRESHOLD,
+        shares: D_SHARES,
+    };
+
+    let (d_verifying_pk, d_verified_kfrags) = fracture_core::commands::grant(grant_args);
+
+    // TODO: ideally we'd want to send one kfrag per trustees, that would then forward them. This implies
+    // the D_SHARES should correspond to the number of trustees. For this POC, we're forwarding one
+    // and assuming a perfect network.
+    let mut data = HashMap::new();
+    data.insert(
+        "d_verifying_pk",
+        hex::encode(fracture_core::helpers::pk_to_bytes(d_verifying_pk)),
+    );
+    data.insert(
+        "d_kfrag",
+        hex::encode(fracture_core::helpers::verified_kfrag_to_bytes(
+            d_verified_kfrags[0].clone(),
+        )),
+    );
+
+    Client::new()
+        .post("http://127.0.0.1:8002/forward_d_kfrag")
+        .json(&data)
+        .send()
+        .await
+        .unwrap();
 }
 
 #[launch]
