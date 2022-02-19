@@ -6,12 +6,16 @@ use std::{collections::HashMap, sync::Arc};
 const D_THRESHOLD: usize = 1;
 const D_SHARES: usize = 2;
 
+use algonaut_client::algod::v2::Client as AlgoClient;
 use fracture_core::{commands::*, helpers::public_key_from_str};
 use parking_lot::RwLock;
 use reqwest::Client;
 use rocket::{serde::json::Json, Config, State};
 use serde::{Deserialize, Serialize};
 use umbral_pre::{DeserializableFromArray, PublicKey, SecretKey};
+
+const ALGOD_URL: &str = "http://localhost:4001";
+const ALGOD_TOKEN: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 #[get("/")]
 fn index() -> &'static str {
@@ -25,6 +29,8 @@ fn set_k(data: Json<SetKData>, memstore: &State<MemStore>) -> String {
     memstore_wg.insert("k_ciphertext".to_string(), data.k_ciphertext.clone());
     memstore_wg.insert("k_pk".to_string(), data.k_pk.clone());
     memstore_wg.insert("k_verifying_pk".to_string(), data.k_verifying_pk.clone());
+    memstore_wg.insert("wallet_address".to_string(), data.wallet_address.clone());
+    memstore_wg.insert("app_id".to_string(), data.app_id.clone());
 
     memstore_wg.get("s_pk").unwrap().clone()
 }
@@ -36,8 +42,43 @@ async fn set_cfrag(data: Json<CfragData>, memstore: &State<MemStore>) {
         memstore_wg.insert("k_cfrag".to_string(), data.k_cfrag.clone());
         memstore_wg.insert("b_pk".to_string(), data.b_pk.clone());
     }
+    let wallet_address = memstore.kv.read().get("wallet_address").unwrap().clone();
+    let app_id = memstore.kv.read().get("app_id").unwrap().clone();
 
-    // TODO: query DAO
+    let mut approved = true;
+    let algo_client = AlgoClient::new(ALGOD_URL, ALGOD_TOKEN).unwrap();
+
+    let account_state = algo_client.account_information(&wallet_address).await;
+    match account_state {
+        Ok(account) => {
+            if let Some(apps_local_state) = account.apps_local_state {
+                for state in apps_local_state {
+                    if state.id.to_string() == app_id {
+                        let mut approvals = 0u64;
+                        let mut threshold = 0u64;
+                        for tealkv in state.key_value {
+                            // base64 encoded threshold
+                            if tealkv.key == "VGhyZXNob2xk" {
+                                threshold = tealkv.value.uint;
+                            }
+                            // base64 encoded approvals
+                            if tealkv.key == "QXBwcm92ZWQ=" {
+                                approvals = tealkv.value.uint;
+                            }
+                        }
+                        if approvals >= threshold {
+                            approved = true
+                        }
+                    }
+                }
+            } else {
+                println!("Account does not have app local state")
+            }
+        }
+        Err(err) => println!("error from blockchain: {}", err),
+    }
+
+    assert!(approved);
 
     // Decrypt d_sk.
     let inner_decrypt_args = {
@@ -140,6 +181,8 @@ struct SetKData {
     k_ciphertext: String,
     k_pk: String,
     k_verifying_pk: String,
+    wallet_address: String, // Freddie's Address string
+    app_id: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

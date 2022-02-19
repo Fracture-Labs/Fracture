@@ -47,21 +47,23 @@ async fn encrypt(data: Json<EncryptData>) {
     let (k_capsule, k_ciphertext) = fracture_core::commands::encrypt(encrypt_args);
 
     // Send k_capsule, k_ciphertext, k_pk, k_verifying_pk to kfraas, get s_pk back.
-    let mut data = HashMap::new();
-    data.insert("k_capsule", hex::encode(k_capsule.clone()));
-    data.insert("k_ciphertext", hex::encode(k_ciphertext));
-    data.insert(
+    let mut out_data = HashMap::new();
+    out_data.insert("k_capsule", hex::encode(k_capsule.clone()));
+    out_data.insert("k_ciphertext", hex::encode(k_ciphertext));
+    out_data.insert(
         "k_pk",
         hex::encode(fracture_core::helpers::pk_to_bytes(k_pk)),
     );
-    data.insert(
+    out_data.insert(
         "k_verifying_pk",
         hex::encode(fracture_core::helpers::pk_to_bytes(k_verifying_pk)),
     );
+    out_data.insert("wallet_address", data.wallet_address.clone());
+    out_data.insert("app_id", data.app_id.clone());
 
     let s_pk_string = Client::new()
         .post("http://127.0.0.1:8001/set_k")
-        .json(&data)
+        .json(&out_data)
         .send()
         .await
         .unwrap()
@@ -171,7 +173,8 @@ async fn decrypt_w_cfrag(data: Json<DecryptWCfragData>, memstore: &State<MemStor
         verifying_pk: fracture_core::helpers::public_key_from_str(&data.d_verifying_pk).unwrap(),
     };
 
-    let inner_decrypt_args = fracture_core::commands::InnerDecryptArgs::from_decrypt_args(decrypt_args).await;
+    let inner_decrypt_args =
+        fracture_core::commands::InnerDecryptArgs::from_decrypt_args(decrypt_args).await;
     let plaintext = fracture_core::commands::decrypt(inner_decrypt_args);
 
     println!("PLAINTEXT: {}", String::from_utf8_lossy(&plaintext));
@@ -387,6 +390,8 @@ fn rocket() -> _ {
 #[derive(Serialize, Deserialize, Debug)]
 struct EncryptData {
     plaintext: String,
+    wallet_address: String,
+    app_id: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
