@@ -9,6 +9,7 @@ edition = "2021"
 default = ["client"]
 client = []
 trustee = []
+proxy = []
 
 [dependencies]
 fracture_core = { path = "../fracture_core" }
