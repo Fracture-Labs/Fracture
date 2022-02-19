@@ -58,14 +58,8 @@ async fn encrypt(data: Json<EncryptData>) {
         "k_verifying_pk",
         hex::encode(fracture_core::helpers::pk_to_bytes(k_verifying_pk)),
     );
-    out_data.insert(
-        "wallet_address",
-        data.wallet_address.clone()
-    );
-    out_data.insert(
-        "app_id",
-		data.app_id.clone()
-    );
+    out_data.insert("wallet_address", data.wallet_address.clone());
+    out_data.insert("app_id", data.app_id.clone());
 
     let s_pk_string = Client::new()
         .post("http://127.0.0.1:8001/set_k")
@@ -179,7 +173,8 @@ async fn decrypt_w_cfrag(data: Json<DecryptWCfragData>, memstore: &State<MemStor
         verifying_pk: fracture_core::helpers::public_key_from_str(&data.d_verifying_pk).unwrap(),
     };
 
-    let inner_decrypt_args = fracture_core::commands::InnerDecryptArgs::from_decrypt_args(decrypt_args).await;
+    let inner_decrypt_args =
+        fracture_core::commands::InnerDecryptArgs::from_decrypt_args(decrypt_args).await;
     let plaintext = fracture_core::commands::decrypt(inner_decrypt_args);
 
     println!("PLAINTEXT: {}", String::from_utf8_lossy(&plaintext));
@@ -395,8 +390,8 @@ fn rocket() -> _ {
 #[derive(Serialize, Deserialize, Debug)]
 struct EncryptData {
     plaintext: String,
-	wallet_address: String, 
-	app_id: String,
+    wallet_address: String,
+    app_id: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
