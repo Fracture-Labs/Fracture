@@ -474,6 +474,7 @@ dependencies = [
  "fracture_core",
  "hex",
  "parking_lot 0.12.0",
+ "reqwest",
  "rocket",
  "serde",
  "serde_json",
