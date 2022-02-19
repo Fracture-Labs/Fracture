@@ -114,6 +114,51 @@ async fn encrypt(data: Json<EncryptData>) {
         .unwrap();
 }
 
+#[post("/decrypt")]
+async fn decrypt(memstore: &State<MemStore>) {
+    // Create a new account for decryption.
+    let (b_sk, b_pk) = fracture_core::commands::new_account();
+
+    // Scope the write lock.
+    {
+        let mut memstore_wg = memstore.kv.write();
+        memstore_wg.insert(
+            "b_sk".to_string(),
+            hex::encode(fracture_core::helpers::sk_to_bytes(b_sk)),
+        );
+        memstore_wg.insert(
+            "b_pk".to_string(),
+            hex::encode(fracture_core::helpers::pk_to_bytes(b_pk)),
+        );
+    }
+
+    // Construct the json payload.
+    let mut data = HashMap::new();
+    data.insert(
+        "b_pk",
+        hex::encode(fracture_core::helpers::pk_to_bytes(b_pk)),
+    );
+
+    // Send request to trustee, changing decrypt state.
+    Client::new()
+        .post("http://127.0.0.1:8002/set_decrypt")
+        .json(&data)
+        .send()
+        .await
+        .unwrap();
+}
+
+//
+// Trustee endpoints
+//
+
+#[post("/set_decrypt", data = "<data>")]
+async fn set_decrypt(data: Json<DecryptData>, memstore: &State<MemStore>) {
+    let mut memstore_wg = memstore.kv.write();
+    memstore_wg.insert("can_decrypt".to_string(), "true".to_string());
+    memstore_wg.insert("b_pk".to_string(), data.b_pk.clone());
+}
+
 #[post("/set_k_kfrags", data = "<data>")]
 async fn set_k_kfrags(data: Json<KfragData>, memstore: &State<MemStore>) {
     let mut memstore_wg = memstore.kv.write();
@@ -136,6 +181,7 @@ async fn status(memstore: &State<MemStore>) -> Json<StatusData> {
         k_pk: memstore_rg.get("k_pk").unwrap().clone(),
         d_capsule_cid: memstore_rg.get("d_capsule_cid").unwrap().clone(),
         d_ciphertext_cid: memstore_rg.get("d_ciphertext_cid").unwrap().clone(),
+        can_decrypt: memstore_rg.get("can_decrypt").unwrap().clone()
     })
 }
 
@@ -149,7 +195,7 @@ fn rocket() -> _ {
 
     rocket::custom(&config)
         .manage(MemStore::new())
-        .mount("/", routes![index, encrypt])
+        .mount("/", routes![index, encrypt, decrypt])
 }
 
 #[cfg(feature = "trustee")]
@@ -160,9 +206,15 @@ fn rocket() -> _ {
         ..Config::debug_default()
     };
 
+    let memstore = MemStore::new();
+    memstore
+        .kv
+        .write()
+        .insert("can_decrypt".to_string(), "false".to_string());
+
     rocket::custom(&config)
-        .manage(MemStore::new())
-        .mount("/", routes![index, set_k_kfrags, status])
+        .manage(memstore)
+        .mount("/", routes![index, set_k_kfrags, status, set_decrypt])
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -185,6 +237,12 @@ struct StatusData {
     k_pk: String,
     d_capsule_cid: String,
     d_ciphertext_cid: String,
+    can_decrypt: String
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct DecryptData {
+    b_pk: String,
 }
 
 struct MemStore {
