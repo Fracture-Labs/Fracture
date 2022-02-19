@@ -7,8 +7,7 @@ use fracture_core::{commands::*, helpers::public_key_from_str};
 use parking_lot::RwLock;
 use rocket::{serde::json::Json, Config, State};
 use serde::{Deserialize, Serialize};
-use umbral_pre::{PublicKey, SecretKey};
-use umbral_pre::DeserializableFromArray;
+use umbral_pre::{DeserializableFromArray, PublicKey, SecretKey};
 
 #[get("/")]
 fn index() -> &'static str {
@@ -45,9 +44,12 @@ async fn set_cfrag(data: Json<CfragData>, memstore: &State<MemStore>) {
             memstore_rg.get("k_cfrag").unwrap(),
         )
         .unwrap()],
-        sender_pk: fracture_core::helpers::public_key_from_str(memstore_rg.get("k_pk").unwrap()).unwrap(),
-        receiver_sk: fracture_core::helpers::secret_key_from_str(memstore_rg.get("s_sk").unwrap()).unwrap(),
-        receiver_pk: fracture_core::helpers::public_key_from_str(memstore_rg.get("s_pk").unwrap()).unwrap(),
+        sender_pk: fracture_core::helpers::public_key_from_str(memstore_rg.get("k_pk").unwrap())
+            .unwrap(),
+        receiver_sk: fracture_core::helpers::secret_key_from_str(memstore_rg.get("s_sk").unwrap())
+            .unwrap(),
+        receiver_pk: fracture_core::helpers::public_key_from_str(memstore_rg.get("s_pk").unwrap())
+            .unwrap(),
         verifying_pk: fracture_core::helpers::public_key_from_str(
             memstore_rg.get("k_verifying_pk").unwrap(),
         )
