@@ -86,36 +86,38 @@ async fn encrypt(data: Json<EncryptData>) {
     let k_verified_kfrags = fracture_core::commands::grant_with_signer(&k_signer, grant_args);
 
     // TODO: send the k_kfrags to the trustees.
-    let mut data = HashMap::new();
-    data.insert("d_capsule_cid", d_capsule_cid);
-    data.insert("d_ciphertext_cid", d_ciphertext_cid);
-    data.insert("k_capsule", hex::encode(k_capsule));
-    data.insert(
+    let mut out_data = HashMap::new();
+    out_data.insert("d_capsule_cid", d_capsule_cid);
+    out_data.insert("d_ciphertext_cid", d_ciphertext_cid);
+    out_data.insert("k_capsule", hex::encode(k_capsule));
+    out_data.insert(
         "d_pk",
         hex::encode(fracture_core::helpers::pk_to_bytes(d_pk)),
     );
-    data.insert(
+    out_data.insert(
         "k_kfrag",
         hex::encode(fracture_core::helpers::verified_kfrag_to_bytes(
             k_verified_kfrags[0].clone(),
         )),
     );
-    data.insert(
+    out_data.insert(
         "k_pk",
         hex::encode(fracture_core::helpers::pk_to_bytes(k_pk)),
     );
-    data.insert(
+    out_data.insert(
         "s_pk",
         hex::encode(fracture_core::helpers::pk_to_bytes(s_pk)),
     );
-    data.insert(
+    out_data.insert(
         "k_verifying_pk",
         hex::encode(fracture_core::helpers::pk_to_bytes(k_verifying_pk)),
     );
+    out_data.insert("wallet_address", data.wallet_address.clone());
+    out_data.insert("app_id", data.app_id.clone());
 
     Client::new()
         .post("http://127.0.0.1:8002/set_k_kfrags")
-        .json(&data)
+        .json(&out_data)
         .send()
         .await
         .unwrap();
@@ -205,6 +207,8 @@ async fn set_k_kfrags(data: Json<KfragData>, memstore: &State<MemStore>) {
     memstore_wg.insert("k_pk".to_string(), data.k_pk.clone());
     memstore_wg.insert("s_pk".to_string(), data.s_pk.clone());
     memstore_wg.insert("k_verifying_pk".to_string(), data.k_verifying_pk.clone());
+    memstore_wg.insert("wallet_address".to_string(), data.wallet_address.clone());
+    memstore_wg.insert("app_id".to_string(), data.app_id.clone());
 }
 
 #[get("/status")]
@@ -216,6 +220,8 @@ async fn status(memstore: &State<MemStore>) -> Json<StatusData> {
         d_capsule_cid: memstore_rg.get("d_capsule_cid").unwrap().clone(),
         d_ciphertext_cid: memstore_rg.get("d_ciphertext_cid").unwrap().clone(),
         can_decrypt: memstore_rg.get("can_decrypt").unwrap().clone(),
+        wallet_address: memstore_rg.get("wallet_address").unwrap().clone(),
+        app_id: memstore_rg.get("app_id").unwrap().clone()
     })
 }
 
@@ -404,6 +410,8 @@ struct KfragData {
     k_pk: String,
     s_pk: String,
     k_verifying_pk: String,
+    wallet_address: String,
+    app_id: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -412,7 +420,10 @@ struct StatusData {
     d_capsule_cid: String,
     d_ciphertext_cid: String,
     can_decrypt: String,
+    wallet_address: String,
+    app_id: String,
 }
+
 
 #[derive(Serialize, Deserialize, Debug)]
 struct DecryptData {
