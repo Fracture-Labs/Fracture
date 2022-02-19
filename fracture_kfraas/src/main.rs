@@ -12,6 +12,7 @@ use reqwest::Client;
 use rocket::{serde::json::Json, Config, State};
 use serde::{Deserialize, Serialize};
 use umbral_pre::{DeserializableFromArray, PublicKey, SecretKey};
+use algonaut_client::algod::v2::Client;
 
 #[get("/")]
 fn index() -> &'static str {
