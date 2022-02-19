@@ -1,10 +1,11 @@
 #[macro_use]
 extern crate rocket;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
+use parking_lot::RwLock;
 use reqwest::Client;
-use rocket::{serde::json::Json, Config};
+use rocket::{serde::json::Json, Config, State};
 use serde::{Deserialize, Serialize};
 
 const D_THRESHOLD: usize = 1;
@@ -19,7 +20,7 @@ fn index() -> &'static str {
 }
 
 #[post("/encrypt", data = "<data>")]
-async fn encrypt(data: Json<Data>) {
+async fn encrypt(data: Json<EncryptData>) {
     let (d_sk, d_pk) = fracture_core::commands::new_account();
     let (k_sk, k_pk) = fracture_core::commands::new_account();
 
@@ -83,8 +84,62 @@ async fn encrypt(data: Json<Data>) {
     let k_verified_kfrags = fracture_core::commands::grant_with_signer(&k_signer, grant_args);
 
     // TODO: send the k_kfrags to the trustees.
+    let mut data = HashMap::new();
+    data.insert("d_capsule_cid", d_capsule_cid);
+    data.insert("d_ciphertext_cid", d_ciphertext_cid);
+    data.insert(
+        "k_kfrag",
+        hex::encode(fracture_core::helpers::verified_kfrag_to_bytes(
+            k_verified_kfrags[0].clone(),
+        )),
+    );
+    data.insert(
+        "k_pk",
+        hex::encode(fracture_core::helpers::pk_to_bytes(k_pk)),
+    );
+    data.insert(
+        "s_pk",
+        hex::encode(fracture_core::helpers::pk_to_bytes(s_pk)),
+    );
+    data.insert(
+        "k_verifying_pk",
+        hex::encode(fracture_core::helpers::pk_to_bytes(k_verifying_pk)),
+    );
+
+    Client::new()
+        .post("http://127.0.0.1:8002/set_k_kfrags")
+        .json(&data)
+        .send()
+        .await
+        .unwrap();
 }
 
+#[post("/set_k_kfrags", data = "<data>")]
+async fn set_k_kfrags(data: Json<KfragData>, memstore: &State<MemStore>) {
+    let mut memstore_wg = memstore.kv.write();
+    memstore_wg.insert("d_capsule_cid".to_string(), data.d_capsule_cid.clone());
+    memstore_wg.insert(
+        "d_ciphertext_cid".to_string(),
+        data.d_ciphertext_cid.clone(),
+    );
+    memstore_wg.insert("k_kfrag".to_string(), data.k_kfrag.clone());
+    memstore_wg.insert("k_pk".to_string(), data.k_pk.clone());
+    memstore_wg.insert("s_pk".to_string(), data.s_pk.clone());
+    memstore_wg.insert("k_verifying_pk".to_string(), data.k_verifying_pk.clone());
+}
+
+#[get("/status")]
+async fn status(memstore: &State<MemStore>) -> Json<StatusData> {
+    let memstore_rg = memstore.kv.read();
+
+    Json(StatusData {
+        k_pk: memstore_rg.get("k_pk").unwrap().clone(),
+        d_capsule_cid: memstore_rg.get("d_capsule_cid").unwrap().clone(),
+        d_ciphertext_cid: memstore_rg.get("d_ciphertext_cid").unwrap().clone(),
+    })
+}
+
+#[cfg(feature = "client")]
 #[launch]
 fn rocket() -> _ {
     let config = Config {
@@ -92,12 +147,54 @@ fn rocket() -> _ {
         ..Config::debug_default()
     };
 
-    rocket::custom(&config).mount("/", routes![index, encrypt])
+    rocket::custom(&config)
+        .manage(MemStore::new())
+        .mount("/", routes![index, encrypt])
+}
+
+#[cfg(feature = "trustee")]
+#[launch]
+fn rocket() -> _ {
+    let config = Config {
+        port: 8002,
+        ..Config::debug_default()
+    };
+
+    rocket::custom(&config)
+        .manage(MemStore::new())
+        .mount("/", routes![index, set_k_kfrags, status])
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct Data {
+struct EncryptData {
     plaintext: String,
 }
 
-struct MemStore {}
+#[derive(Serialize, Deserialize, Debug)]
+struct KfragData {
+    d_capsule_cid: String,
+    d_ciphertext_cid: String,
+    k_kfrag: String,
+    k_pk: String,
+    s_pk: String,
+    k_verifying_pk: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct StatusData {
+    k_pk: String,
+    d_capsule_cid: String,
+    d_ciphertext_cid: String,
+}
+
+struct MemStore {
+    kv: Arc<RwLock<HashMap<String, String>>>,
+}
+
+impl MemStore {
+    fn new() -> Self {
+        MemStore {
+            kv: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+}

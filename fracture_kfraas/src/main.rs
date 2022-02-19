@@ -16,7 +16,6 @@ fn index() -> &'static str {
 
 #[post("/set_k", data = "<data>")]
 fn set_k(data: Json<SetKData>, memstore: &State<MemStore>) -> String {
-    // Scope the write.
     let mut memstore_wg = memstore.kv.write();
     memstore_wg.insert("k_capsule".to_string(), data.k_capsule.clone());
     memstore_wg.insert("k_ciphertext".to_string(), data.k_ciphertext.clone());
