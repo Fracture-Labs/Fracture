@@ -48,7 +48,7 @@ async fn encrypt(data: Json<EncryptData>) {
 
     // Send k_capsule, k_ciphertext, k_pk, k_verifying_pk to kfraas, get s_pk back.
     let mut data = HashMap::new();
-    data.insert("k_capsule", hex::encode(k_capsule));
+    data.insert("k_capsule", hex::encode(k_capsule.clone()));
     data.insert("k_ciphertext", hex::encode(k_ciphertext));
     data.insert(
         "k_pk",
@@ -87,6 +87,7 @@ async fn encrypt(data: Json<EncryptData>) {
     let mut data = HashMap::new();
     data.insert("d_capsule_cid", d_capsule_cid);
     data.insert("d_ciphertext_cid", d_ciphertext_cid);
+    data.insert("k_capsule", hex::encode(k_capsule));
     data.insert(
         "k_kfrag",
         hex::encode(fracture_core::helpers::verified_kfrag_to_bytes(
@@ -167,6 +168,7 @@ async fn set_k_kfrags(data: Json<KfragData>, memstore: &State<MemStore>) {
         "d_ciphertext_cid".to_string(),
         data.d_ciphertext_cid.clone(),
     );
+    memstore_wg.insert("k_capsule".to_string(), data.k_capsule.clone());
     memstore_wg.insert("k_kfrag".to_string(), data.k_kfrag.clone());
     memstore_wg.insert("k_pk".to_string(), data.k_pk.clone());
     memstore_wg.insert("s_pk".to_string(), data.s_pk.clone());
@@ -181,8 +183,52 @@ async fn status(memstore: &State<MemStore>) -> Json<StatusData> {
         k_pk: memstore_rg.get("k_pk").unwrap().clone(),
         d_capsule_cid: memstore_rg.get("d_capsule_cid").unwrap().clone(),
         d_ciphertext_cid: memstore_rg.get("d_ciphertext_cid").unwrap().clone(),
-        can_decrypt: memstore_rg.get("can_decrypt").unwrap().clone()
+        can_decrypt: memstore_rg.get("can_decrypt").unwrap().clone(),
     })
+}
+
+#[post("/send_cfrag")]
+async fn send_cfrag(memstore: &State<MemStore>) {
+    // Generate cfrag and scope the read lock.
+    let inner_pre_args = {
+        let memstore_rg = memstore.kv.read();
+        fracture_core::commands::InnerPreArgs {
+            capsule_bytes: hex::decode(memstore_rg.get("k_capsule").unwrap()).unwrap(),
+            kfrag: fracture_core::helpers::key_frag_from_str(memstore_rg.get("k_kfrag").unwrap())
+                .unwrap(),
+            sender_pk: fracture_core::helpers::public_key_from_str(
+                memstore_rg.get("k_pk").unwrap(),
+            )
+            .unwrap(),
+            receiver_pk: fracture_core::helpers::public_key_from_str(
+                memstore_rg.get("s_pk").unwrap(),
+            )
+            .unwrap(),
+            verifying_pk: fracture_core::helpers::public_key_from_str(
+                memstore_rg.get("k_verifying_pk").unwrap(),
+            )
+            .unwrap(),
+        }
+    };
+
+    let verified_k_cfrag = fracture_core::commands::pre(inner_pre_args);
+
+    // Send the cfrag to the kfraas.
+    let mut data = HashMap::new();
+    data.insert(
+        "k_cfrag",
+        hex::encode(fracture_core::helpers::verified_cfrag_to_bytes(
+            verified_k_cfrag,
+        )),
+    );
+    data.insert("b_pk", memstore.kv.read().get("b_pk").unwrap().clone());
+
+    Client::new()
+        .post("http://127.0.0.1:8001/set_cfrag")
+        .json(&data)
+        .send()
+        .await
+        .unwrap();
 }
 
 #[cfg(feature = "client")]
@@ -212,9 +258,10 @@ fn rocket() -> _ {
         .write()
         .insert("can_decrypt".to_string(), "false".to_string());
 
-    rocket::custom(&config)
-        .manage(memstore)
-        .mount("/", routes![index, set_k_kfrags, status, set_decrypt])
+    rocket::custom(&config).manage(memstore).mount(
+        "/",
+        routes![index, set_k_kfrags, status, set_decrypt, send_cfrag],
+    )
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -226,6 +273,7 @@ struct EncryptData {
 struct KfragData {
     d_capsule_cid: String,
     d_ciphertext_cid: String,
+    k_capsule: String,
     k_kfrag: String,
     k_pk: String,
     s_pk: String,
@@ -237,7 +285,7 @@ struct StatusData {
     k_pk: String,
     d_capsule_cid: String,
     d_ciphertext_cid: String,
-    can_decrypt: String
+    can_decrypt: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -8,6 +8,7 @@ use parking_lot::RwLock;
 use rocket::{serde::json::Json, Config, State};
 use serde::{Deserialize, Serialize};
 use umbral_pre::{PublicKey, SecretKey};
+use umbral_pre::DeserializableFromArray;
 
 #[get("/")]
 fn index() -> &'static str {
@@ -23,6 +24,43 @@ fn set_k(data: Json<SetKData>, memstore: &State<MemStore>) -> String {
     memstore_wg.insert("k_verifying_pk".to_string(), data.k_verifying_pk.clone());
 
     memstore_wg.get("s_pk").unwrap().clone()
+}
+
+#[post("/set_cfrag", data = "<data>")]
+async fn set_cfrag(data: Json<CfragData>, memstore: &State<MemStore>) {
+    {
+        let mut memstore_wg = memstore.kv.write();
+        memstore_wg.insert("k_cfrag".to_string(), data.k_cfrag.clone());
+        memstore_wg.insert("b_pk".to_string(), data.b_pk.clone());
+    }
+
+    // TODO: query DAO
+
+    // Decrypt d_sk.
+    let memstore_rg = memstore.kv.read();
+    let inner_decrypt_args = fracture_core::commands::InnerDecryptArgs {
+        capsule_bytes: hex::decode(memstore_rg.get("k_capsule").unwrap()).unwrap(),
+        ciphertext: hex::decode(memstore_rg.get("k_ciphertext").unwrap()).unwrap(),
+        cfrags: vec![fracture_core::helpers::capsule_frag_from_str(
+            memstore_rg.get("k_cfrag").unwrap(),
+        )
+        .unwrap()],
+        sender_pk: fracture_core::helpers::public_key_from_str(memstore_rg.get("k_pk").unwrap()).unwrap(),
+        receiver_sk: fracture_core::helpers::secret_key_from_str(memstore_rg.get("s_sk").unwrap()).unwrap(),
+        receiver_pk: fracture_core::helpers::public_key_from_str(memstore_rg.get("s_pk").unwrap()).unwrap(),
+        verifying_pk: fracture_core::helpers::public_key_from_str(
+            memstore_rg.get("k_verifying_pk").unwrap(),
+        )
+        .unwrap(),
+    };
+
+    // Decrypt the d_sk.
+    let d_sk_bytes = fracture_core::commands::decrypt(inner_decrypt_args);
+    let d_sk = SecretKey::from_bytes(d_sk_bytes.clone()).unwrap();
+
+    println!("SECRET_KEY: {}", hex::encode(d_sk_bytes));
+
+    // Generate the kfrags for the data.
 }
 
 #[launch]
@@ -46,7 +84,7 @@ fn rocket() -> _ {
 
     rocket::custom(&config)
         .manage(memstore)
-        .mount("/", routes![index, set_k])
+        .mount("/", routes![index, set_k, set_cfrag])
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -55,6 +93,12 @@ struct SetKData {
     k_ciphertext: String,
     k_pk: String,
     k_verifying_pk: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct CfragData {
+    k_cfrag: String,
+    b_pk: String,
 }
 
 struct MemStore {

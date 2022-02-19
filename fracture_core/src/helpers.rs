@@ -17,6 +17,10 @@ pub fn verified_kfrag_to_bytes(kfrag: VerifiedKeyFrag) -> Vec<u8> {
     kfrag.to_array().to_vec()
 }
 
+pub fn verified_cfrag_to_bytes(cfrag: VerifiedCapsuleFrag) -> Vec<u8> {
+    cfrag.to_array().to_vec()
+}
+
 // Helpers
 // TODO (nkls): error handling + dedup with macro
 pub fn public_key_from_str(s: &str) -> Result<PublicKey, &'static str> {
