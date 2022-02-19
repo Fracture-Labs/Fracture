@@ -41,7 +41,7 @@ Since the design of the solution, we have found that use cases for this solution
 
 ### Param table
 
-Prefix convention: 
+Prefix convention:
 - `d_`: relating to the encrypted data
 - `k_`: relating to the encrypted `d_sk`
 - `t_`: relating to the trustees
@@ -72,6 +72,26 @@ Prefix convention:
 > Implementing the Umbral threshold proxy re-encryption scheme with IPFS
 
 ## Usage
+
+### E2E
+
+```
+# Start the client (port 8000):
+$ cd fracture_client
+$ cargo r
+
+# In a new terminal window, start the trustee's client (port 8002):
+$ cargo r --features trustee --no-default-features
+
+# In another window, start the proxie's client (port 8003):
+cargo r --features proxy --no-default-features
+
+# In another window, start the kfraas server (port 8001):
+$ cd fracture_kfraas
+$ cargo r
+```
+
+### CLI
 
 ```
 umbral_ipfs account
