@@ -181,16 +181,18 @@ async fn decrypt_w_cfrag(data: Json<DecryptWCfragData>, memstore: &State<MemStor
 
     // println!("PLAINTEXT: {}", String::from_utf8_lossy(&plaintext));
 
-    memstore.kv.write().insert("plaintext".to_string(), hex::encode(plaintext));
+    memstore
+        .kv
+        .write()
+        .insert("plaintext".to_string(), hex::encode(plaintext));
 }
 
 #[get("/plaintext")]
 async fn plaintext(memstore: &State<MemStore>) -> Json<PlaintextData> {
     Json(PlaintextData {
-        plaintext: memstore.kv.read().get("plaintext").unwrap().clone()
+        plaintext: memstore.kv.read().get("plaintext").unwrap().clone(),
     })
 }
-
 
 //
 // Trustee endpoints
@@ -231,7 +233,7 @@ async fn status(memstore: &State<MemStore>) -> Json<StatusData> {
         d_ciphertext_cid: memstore_rg.get("d_ciphertext_cid").unwrap().clone(),
         can_decrypt: memstore_rg.get("can_decrypt").unwrap().clone(),
         wallet_address: memstore_rg.get("wallet_address").unwrap().clone(),
-        app_id: memstore_rg.get("app_id").unwrap().clone()
+        app_id: memstore_rg.get("app_id").unwrap().clone(),
     })
 }
 
@@ -358,9 +360,10 @@ fn rocket() -> _ {
         ..Config::debug_default()
     };
 
-    rocket::custom(&config)
-        .manage(MemStore::new())
-        .mount("/", routes![index, encrypt, decrypt, decrypt_w_cfrag, plaintext])
+    rocket::custom(&config).manage(MemStore::new()).mount(
+        "/",
+        routes![index, encrypt, decrypt, decrypt_w_cfrag, plaintext],
+    )
 }
 
 #[cfg(feature = "trustee")]
@@ -433,7 +436,6 @@ struct StatusData {
     wallet_address: String,
     app_id: String,
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 struct DecryptData {
