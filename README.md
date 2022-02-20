@@ -3,6 +3,8 @@
 Fracture implements the Umbral threshold proxy reincryption scheme. It also
 contains the HTTP-based backend code Constitute plugs into.
 
+For details please see dio.earth.
+
 ## Future Goals
 
 This being a POC, there are many aspects of Fracture we want to improve:
