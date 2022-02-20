@@ -1,26 +1,29 @@
 #[macro_use]
 extern crate rocket;
 
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
+#[cfg(not(feature = "proxy"))]
+use std::sync::Arc;
 
+#[cfg(not(feature = "proxy"))]
 use parking_lot::RwLock;
 use reqwest::Client;
-use rocket::{serde::json::Json, Config, State};
+#[cfg(not(feature = "proxy"))]
+use rocket::State;
+use rocket::{serde::json::Json, Config};
 use serde::{Deserialize, Serialize};
-
-const D_THRESHOLD: usize = 1;
-const D_SHARES: usize = 2;
-
-const K_THRESHOLD: usize = 1;
-const K_SHARES: usize = 2;
 
 #[get("/")]
 fn index() -> &'static str {
     "Hello Constitution, this is Fracture!"
 }
 
+#[cfg(feature = "client")]
 #[post("/encrypt", data = "<data>")]
 async fn encrypt(data: Json<EncryptData>) {
+    const K_THRESHOLD: usize = 1;
+    const K_SHARES: usize = 2;
+
     let (d_sk, d_pk) = fracture_core::commands::new_account();
     let (k_sk, k_pk) = fracture_core::commands::new_account();
 
@@ -123,6 +126,7 @@ async fn encrypt(data: Json<EncryptData>) {
         .unwrap();
 }
 
+#[cfg(feature = "client")]
 #[post("/decrypt")]
 async fn decrypt(memstore: &State<MemStore>) {
     // Create a new account for decryption.
@@ -157,6 +161,7 @@ async fn decrypt(memstore: &State<MemStore>) {
         .unwrap();
 }
 
+#[cfg(feature = "client")]
 #[post("/decrypt_w_cfrag", data = "<data>")]
 async fn decrypt_w_cfrag(data: Json<DecryptWCfragData>, memstore: &State<MemStore>) {
     let decrypt_args = fracture_core::cli::DecryptArgs {
@@ -187,6 +192,7 @@ async fn decrypt_w_cfrag(data: Json<DecryptWCfragData>, memstore: &State<MemStor
         .insert("plaintext".to_string(), hex::encode(plaintext));
 }
 
+#[cfg(feature = "client")]
 #[get("/plaintext")]
 async fn plaintext(memstore: &State<MemStore>) -> Json<PlaintextData> {
     Json(PlaintextData {
@@ -198,6 +204,7 @@ async fn plaintext(memstore: &State<MemStore>) -> Json<PlaintextData> {
 // Trustee endpoints
 //
 
+#[cfg(feature = "trustee")]
 #[post("/set_decrypt", data = "<data>")]
 async fn set_decrypt(data: Json<DecryptData>, memstore: &State<MemStore>) {
     let mut memstore_wg = memstore.kv.write();
@@ -205,6 +212,7 @@ async fn set_decrypt(data: Json<DecryptData>, memstore: &State<MemStore>) {
     memstore_wg.insert("b_pk".to_string(), data.b_pk.clone());
 }
 
+#[cfg(feature = "trustee")]
 #[post("/set_k_kfrags", data = "<data>")]
 async fn set_k_kfrags(data: Json<KfragData>, memstore: &State<MemStore>) {
     let mut memstore_wg = memstore.kv.write();
@@ -223,6 +231,7 @@ async fn set_k_kfrags(data: Json<KfragData>, memstore: &State<MemStore>) {
     memstore_wg.insert("app_id".to_string(), data.app_id.clone());
 }
 
+#[cfg(feature = "trustee")]
 #[get("/status")]
 async fn status(memstore: &State<MemStore>) -> Json<StatusData> {
     let memstore_rg = memstore.kv.read();
@@ -237,6 +246,7 @@ async fn status(memstore: &State<MemStore>) -> Json<StatusData> {
     })
 }
 
+#[cfg(feature = "trustee")]
 #[post("/send_cfrag")]
 async fn send_cfrag(memstore: &State<MemStore>) {
     // Generate cfrag and scope the read lock.
@@ -281,6 +291,7 @@ async fn send_cfrag(memstore: &State<MemStore>) {
         .unwrap();
 }
 
+#[cfg(feature = "trustee")]
 #[post("/forward_d_kfrag", data = "<data>")]
 async fn forward_d_kfrag(data: Json<ForwardKfragData>, memstore: &State<MemStore>) {
     // Add the cid to the data to be forwarded to the proxies.
@@ -314,8 +325,11 @@ async fn forward_d_kfrag(data: Json<ForwardKfragData>, memstore: &State<MemStore
         .unwrap();
 }
 
+//
 // Proxy
+//
 
+#[cfg(feature = "proxy")]
 #[post("/set_d_cfrag", data = "<data>")]
 async fn set_d_cfrag(data: Json<SetCfragData>) {
     // TODO: store the d_kfrag, check the threshold, if all fragements have been received, generate
@@ -401,9 +415,7 @@ fn rocket() -> _ {
         ..Config::debug_default()
     };
 
-    rocket::custom(&config)
-        .manage(MemStore::new())
-        .mount("/", routes![index, set_d_cfrag])
+    rocket::custom(&config).mount("/", routes![index, set_d_cfrag])
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -474,10 +486,12 @@ struct PlaintextData {
     plaintext: String,
 }
 
+#[cfg(not(feature = "proxy"))]
 struct MemStore {
     kv: Arc<RwLock<HashMap<String, String>>>,
 }
 
+#[cfg(not(feature = "proxy"))]
 impl MemStore {
     fn new() -> Self {
         MemStore {
