@@ -7,12 +7,11 @@ const D_THRESHOLD: usize = 1;
 const D_SHARES: usize = 2;
 
 use algonaut_client::algod::v2::Client as AlgoClient;
-use fracture_core::{commands::*, helpers::public_key_from_str};
 use parking_lot::RwLock;
 use reqwest::Client;
 use rocket::{serde::json::Json, Config, State};
 use serde::{Deserialize, Serialize};
-use umbral_pre::{DeserializableFromArray, PublicKey, SecretKey};
+use umbral_pre::{DeserializableFromArray, SecretKey};
 
 const ALGOD_URL: &str = "http://localhost:4001";
 const ALGOD_TOKEN: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
