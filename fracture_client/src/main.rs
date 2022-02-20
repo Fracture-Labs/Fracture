@@ -179,8 +179,18 @@ async fn decrypt_w_cfrag(data: Json<DecryptWCfragData>, memstore: &State<MemStor
         fracture_core::commands::InnerDecryptArgs::from_decrypt_args(decrypt_args).await;
     let plaintext = fracture_core::commands::decrypt(inner_decrypt_args);
 
-    println!("PLAINTEXT: {}", String::from_utf8_lossy(&plaintext));
+    // println!("PLAINTEXT: {}", String::from_utf8_lossy(&plaintext));
+
+    memstore.kv.write().insert("plaintext".to_string(), hex::encode(plaintext));
 }
+
+#[get("/plaintext")]
+async fn plaintext(memstore: &State<MemStore>) -> Json<PlaintextData> {
+    Json(PlaintextData {
+        plaintext: memstore.kv.read().get("plaintext").unwrap().clone()
+    })
+}
+
 
 //
 // Trustee endpoints
@@ -350,7 +360,7 @@ fn rocket() -> _ {
 
     rocket::custom(&config)
         .manage(MemStore::new())
-        .mount("/", routes![index, encrypt, decrypt, decrypt_w_cfrag])
+        .mount("/", routes![index, encrypt, decrypt, decrypt_w_cfrag, plaintext])
 }
 
 #[cfg(feature = "trustee")]
@@ -455,6 +465,11 @@ struct DecryptWCfragData {
     d_pk: String,
     d_verifying_pk: String,
     d_cfrag: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct PlaintextData {
+    plaintext: String,
 }
 
 struct MemStore {
